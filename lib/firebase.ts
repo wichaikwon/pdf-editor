@@ -11,6 +11,7 @@ const firebaseConfig = {
   measurementId: "G-ZEFXXTGBFX"
 };
 
+
 const app = !getApps().length ? initializeApp(firebaseConfig) : getApp();
 
 // Conditionally enable analytics
