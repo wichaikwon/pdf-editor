@@ -1,37 +1,27 @@
 // 'use client'
 // import { loadPdf } from '@/utils/pdfUtils'
-// import {
-//   ChevronLeft,
-//   ChevronRight,
-//   CircleMinus,
-//   CirclePlus,
-//   Hand,
-//   Signature,
-//   Type,
-// } from 'lucide-react'
+// import { ChevronLeft, ChevronRight, Signature, Type } from 'lucide-react'
 // import { PDFDocumentProxy } from 'pdfjs-dist'
 // import React, { useEffect, useRef, useState } from 'react'
 // import SignatureCanvas from 'react-signature-canvas'
+// import { PDFDocument } from 'pdf-lib'
 
 // const UploadPdf: React.FC = () => {
 //   const UploadPdf = useRef<HTMLInputElement>(null)
 //   const canvasRef = useRef<HTMLCanvasElement>(null)
 //   const containerRef = useRef<HTMLDivElement>(null)
 //   const signatureRef = useRef<SignatureCanvas | null>(null)
-
+//   const lastDistanceRef = useRef<number | null>(null)
+//   const offsetRef = useRef({ x: 0, y: 0 })
+//   const isDraggingRef = useRef(false)
 //   const [pdfDoc, setPdfDoc] = useState<PDFDocumentProxy | null>(null)
 //   const [totalPages, setTotalPages] = useState<number>(0)
 //   const [currentPage, setCurrentPage] = useState<number>(1)
-//   const [modalZoom, setModalZoom] = useState<boolean>(false)
 //   const [isSignature, setIsSignature] = useState<boolean>(false)
 //   const [zoomValue, setZoomValue] = useState<number>(100)
-//   const lastDistanceRef = useRef<number | null>(null)
-
+//   const [confirmSignature, setConfirmSignature] = useState<boolean>(false)
 //   const [signatureImgUrl, setSignatureImgUrl] = useState<string | null>(null)
 //   const [sigPosition, setSigPosition] = useState({ x: 50, y: 50 })
-//   const dragRef = useRef<HTMLImageElement>(null)
-//   const isDraggingRef = useRef(false)
-//   const offsetRef = useRef({ x: 0, y: 0 })
 
 //   useEffect(() => {
 //     const container = containerRef.current
@@ -81,7 +71,6 @@
 //     if (pdfDoc) {
 //       renderPage(currentPage)
 //     }
-//     // eslint-disable-next-line
 //   }, [pdfDoc, currentPage, zoomValue])
 
 //   useEffect(() => {
@@ -149,28 +138,35 @@
 //     if (!canvasRef.current || !pdfDoc) return
 //     try {
 //       const page = await pdfDoc.getPage(pageNumber)
-//       // Responsive width: use container width or window width (with max)
-//       const containerWidth =
-//         containerRef.current?.offsetWidth ||
-//         Math.min(window.innerWidth - 32, 800)
+//       const containerWidth = containerRef.current?.offsetWidth || 800
 //       const baseViewport = page.getViewport({ scale: 1 })
 //       const scale = (containerWidth / baseViewport.width) * (zoomValue / 100)
 //       const viewport = page.getViewport({ scale })
+
+//       const outputScale = window.devicePixelRatio || 1
+
 //       const canvas = canvasRef.current
 //       const context = canvas.getContext('2d')
 
-//       if (canvas && context) {
-//         context.clearRect(0, 0, canvas.width, canvas.height)
-//         canvas.height = viewport.height
-//         canvas.width = viewport.width
+//       canvas.width = viewport.width * outputScale
+//       canvas.height = viewport.height * outputScale
 
-//         const renderContext = {
-//           canvasContext: context,
-//           viewport,
-//         }
+//       canvas.style.width = `${viewport.width}px`
+//       canvas.style.height = `${viewport.height}px`
 
-//         await page.render(renderContext).promise
+//       if (context) {
+//         context.setTransform(outputScale, 0, 0, outputScale, 0, 0)
+//       } else {
+//         console.error('Failed to get 2D context for canvas')
+//         return
 //       }
+
+//       const renderContext = {
+//         canvasContext: context,
+//         viewport,
+//       }
+
+//       await page.render(renderContext).promise
 //     } catch (error) {
 //       console.error('Error rendering page:', error)
 //     }
@@ -189,7 +185,6 @@
 //     const img = new Image()
 //     img.onload = () => {
 //       ctx?.drawImage(img, sigPosition.x, sigPosition.y, 150, 50)
-//       setSignatureImgUrl(null)
 //     }
 //     img.src = signatureImgUrl
 //   }
@@ -205,6 +200,61 @@
 //       setCurrentPage(prev => Math.max(prev - 1, 1))
 //     }
 //   }
+//   const savePdfWithSignature = async () => {
+//     if (!pdfDoc || !signatureImgUrl || !canvasRef.current) {
+//       alert('กรุณาเตรียมเอกสารและลายเซ็นให้พร้อมก่อนบันทึก')
+//       return
+//     }
+//     try {
+//       const canvas = canvasRef.current
+//       const imageData = canvas.toDataURL('image/png')
+
+//       const pdfDocLib = await PDFDocument.create()
+//       const pngImageBytes = await fetch(imageData).then(res => res.arrayBuffer())
+//       const pngImage = await pdfDocLib.embedPng(pngImageBytes)
+
+//       const page = pdfDocLib.addPage([canvas.width, canvas.height])
+//       page.drawImage(pngImage, {
+//         x: 0,
+//         y: 0,
+//         width: canvas.width,
+//         height: canvas.height,
+//       })
+
+//       const pdfBytes = await pdfDocLib.save()
+//       const blob = new Blob([pdfBytes], { type: 'application/pdf' })
+//       const url = URL.createObjectURL(blob)
+
+//       const a = document.createElement('a')
+//       a.href = url
+//       a.download = 'เอกสารพร้อมลายเซ็น.pdf'
+//       document.body.appendChild(a)
+//       a.click()
+//       document.body.removeChild(a)
+//       URL.revokeObjectURL(url)
+//       alert('บันทึกไฟล์สำเร็จ: เอกสารพร้อมลายเซ็น.pdf')
+//       setSignatureImgUrl(null)
+//       setSigPosition({ x: 50, y: 50 })
+//       signatureRef.current?.clear()
+//       canvasRef.current.getContext('2d')?.clearRect(0, 0, canvasRef.current.width, canvasRef.current.height)
+//       setConfirmSignature(false)
+//       setPdfDoc(null)
+//       setTotalPages(0)
+//       setCurrentPage(1)
+//       if (UploadPdf.current) {
+//         UploadPdf.current.value = ''
+//       }
+
+//       setTimeout(() => {
+//         document.body.removeChild(a)
+//         URL.revokeObjectURL(url)
+//       }, 100)
+//     } catch (error) {
+//       console.error('เกิดข้อผิดพลาดในการบันทึกไฟล์:', error)
+//       const errorMessage = error instanceof Error ? error.message : String(error)
+//       alert('บันทึกไฟล์ไม่สำเร็จ: ' + errorMessage)
+//     }
+//   }
 
 //   return (
 //     <div className="flex flex-col items-center justify-center relative w-full px-2">
@@ -218,18 +268,13 @@
 
 //       {pdfDoc && (
 //         <div className="w-full max-w-4xl relative">
-//           {/* Toolbar */}
 //           <div className="flex flex-wrap items-center justify-between gap-2 sm:gap-4 w-full py-2">
 //             <div className="flex gap-2">
-//               <button>
-//                 <Hand />
-//               </button>
 //               <button>
 //                 <Type />
 //               </button>
 //             </div>
 
-//             {/* Page Navigation */}
 //             <div className="flex items-center gap-2">
 //               <button onClick={prevPage} disabled={currentPage <= 1}>
 //                 <ChevronLeft />
@@ -251,52 +296,17 @@
 //                 <ChevronRight />
 //               </button>
 //             </div>
-
-//             {/* Zoom Controls */}
-//             <div className="flex items-center gap-2">
-//               <button onClick={() => setZoomValue(z => Math.max(25, z - 25))}>
-//                 <CircleMinus />
-//               </button>
-//               <div className="relative">
-//                 <button onClick={() => setModalZoom(!modalZoom)}>{zoomValue}%</button>
-//                 {modalZoom && (
-//                   <div className="absolute bg-white rounded py-2 shadow-lg z-10 min-w-[60px]">
-//                     <div className="flex flex-col gap-1">
-//                       {[100, 125, 150, 175, 200].map(val => (
-//                         <button
-//                           key={val}
-//                           className={`px-2 ${zoomValue === val ? 'bg-blue-500 text-white' : ''}`}
-//                           onClick={() => {
-//                             setZoomValue(val)
-//                             setModalZoom(false)
-//                           }}
-//                         >
-//                           {val}%
-//                         </button>
-//                       ))}
-//                     </div>
-//                   </div>
-//                 )}
-//               </div>
-//               <button onClick={() => setZoomValue(z => Math.min(200, z + 25))}>
-//                 <CirclePlus />
-//               </button>
-//             </div>
-
-//             {/* Signature Button */}
 //             <button onClick={() => setIsSignature(true)} className="flex items-center gap-1">
 //               <Signature />
 //             </button>
 //           </div>
 
-//           {/* PDF Viewer */}
 //           <div
 //             ref={containerRef}
 //             className="relative w-full flex justify-center items-center overflow-auto mt-2 border rounded bg-white"
 //             style={{
 //               maxWidth: '100%',
 //               minHeight: '300px',
-//               // Responsive minHeight for mobile
 //               minWidth: 0,
 //             }}
 //           >
@@ -347,21 +357,32 @@
 //               />
 //             )}
 //           </div>
-//           {/* Confirm signature placement button (responsive) */}
 //           {signatureImgUrl && (
 //             <div className="flex justify-center mt-2">
-//               <button
-//                 onClick={confirmSignaturePlacement}
-//                 className="bg-green-500 text-white px-4 py-2 rounded"
-//               >
-//                 ยืนยันตำแหน่งลายเซ็น
-//               </button>
+//               {!confirmSignature && (
+//                 <button
+//                   onClick={() => {
+//                     confirmSignaturePlacement()
+//                     setConfirmSignature(true)
+//                   }}
+//                   className="bg-green-500 text-white px-4 py-2 rounded"
+//                 >
+//                   ยืนยันตำแหน่งลายเซ็น
+//                 </button>
+//               )}
 //             </div>
 //           )}
 //         </div>
 //       )}
+//       {pdfDoc && confirmSignature && (
+//         <button
+//           onClick={() => savePdfWithSignature()}
+//           className="bg-blue-600 text-white px-4 py-2 rounded my-4"
+//         >
+//           Save PDF with Signature
+//         </button>
+//       )}
 
-//       {/* Signature Modal */}
 //       {isSignature && (
 //         <div
 //           className="fixed inset-0 bg-black/50 flex items-center justify-center z-10"
@@ -372,29 +393,30 @@
 //             onClick={e => e.stopPropagation()}
 //           >
 //             <h2 className="text-lg font-semibold mb-2">Signature Mode</h2>
-//             <p className="mb-4">Draw your signature below:</p>
+//             <p className="text-sm text-gray-600 mb-4">
+//               Draw your signature below, then press "Use Signature".
+//             </p>
 //             <SignatureCanvas
+//               ref={signatureRef}
 //               penColor="black"
 //               canvasProps={{
 //                 width: 300,
 //                 height: 100,
-//                 className: 'border border-gray-300 rounded mb-2 w-full h-24',
-//                 style: { width: '100%', height: '100px' },
+//                 className: 'border border-gray-300 rounded w-full',
 //               }}
-//               ref={signatureRef}
 //             />
-//             <div className="flex flex-col sm:flex-row gap-2 mt-2">
+//             <div className="flex justify-between mt-4">
 //               <button
-//                 onClick={handlePlaceSignature}
-//                 className="bg-green-500 text-white px-4 py-2 rounded"
+//                 className="bg-gray-400 text-white px-4 py-2 rounded"
+//                 onClick={() => signatureRef.current?.clear()}
 //               >
-//                 วางลายเซ็นบน PDF
+//                 Clear
 //               </button>
 //               <button
-//                 onClick={() => setIsSignature(false)}
-//                 className="bg-blue-500 text-white px-4 py-2 rounded"
+//                 className="bg-blue-600 text-white px-4 py-2 rounded"
+//                 onClick={handlePlaceSignature}
 //               >
-//                 Close
+//                 Use Signature
 //               </button>
 //             </div>
 //           </div>
