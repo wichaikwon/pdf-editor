@@ -1,7 +1,7 @@
 'use client'
 import React, { useEffect, useRef, useState } from 'react'
 import { PDFDocumentProxy } from 'pdfjs-dist'
-import { loadPdf } from '@/utils/pdfUtils'
+import { loadPDF } from '@/utils/pdfUtils'
 import { TransformWrapper, TransformComponent } from 'react-zoom-pan-pinch'
 import { ChevronLeft, ChevronRight, Save, Signature, X } from 'lucide-react'
 import SignatureCanvas from 'react-signature-canvas'
@@ -120,7 +120,7 @@ const UploadPdf: React.FC = () => {
         const pdfData = e.target?.result
         if (pdfData) {
           try {
-            const pdf = await loadPdf(pdfData as ArrayBuffer)
+            const pdf = await loadPDF(pdfData as string)
             setPdfDocument(pdf)
             setTotalPages(pdf.numPages)
             setShowSignatureOnPdf(false)
