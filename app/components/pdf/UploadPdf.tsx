@@ -3,7 +3,7 @@ import React, { useEffect, useRef, useState } from 'react'
 import { PDFDocumentProxy } from 'pdfjs-dist'
 import { loadPDF } from '@/utils/pdfUtils'
 import { TransformWrapper, TransformComponent } from 'react-zoom-pan-pinch'
-import { ChevronLeft, ChevronRight, Save, Signature, X } from 'lucide-react'
+import { ChevronLeft, ChevronRight, Save, Signature, X, ZoomIn, ZoomOut } from 'lucide-react'
 import SignatureCanvas from 'react-signature-canvas'
 
 const UploadPdf: React.FC = () => {
@@ -21,7 +21,6 @@ const UploadPdf: React.FC = () => {
   const [isDraggingSignature, setIsDraggingSignature] = useState(false)
   const [showSignatureOnPdf, setShowSignatureOnPdf] = useState(false)
 
-  // ฟังก์ชันสำหรับวางลายเซ็น
   const handlePlaceSignature = () => {
     if (!signatureRef.current) return
     const dataUrl = signatureRef.current.toDataURL()
@@ -30,7 +29,6 @@ const UploadPdf: React.FC = () => {
     setShowSignatureOnPdf(true)
   }
 
-  // เริ่มลากลายเซ็น
   const startDraggingSignature = (e: React.MouseEvent) => {
     setIsDraggingSignature(true)
     const rect = e.currentTarget.getBoundingClientRect()
@@ -40,7 +38,6 @@ const UploadPdf: React.FC = () => {
     })
   }
 
-  // ขณะลากลายเซ็น
   const handleDragSignature = (e: React.MouseEvent) => {
     if (!isDraggingSignature) return
     const rect = e.currentTarget.getBoundingClientRect()
@@ -50,7 +47,6 @@ const UploadPdf: React.FC = () => {
     })
   }
 
-  // หยุดลากลายเซ็น
   const stopDraggingSignature = () => {
     setIsDraggingSignature(false)
   }
@@ -88,12 +84,10 @@ const UploadPdf: React.FC = () => {
         }
         await page.render(renderContext).promise
 
-        // วาดลายเซ็นบน PDF ถ้ามี
         if (showSignatureOnPdf && signatureImgUrl) {
           const img = new Image()
           img.src = signatureImgUrl
           img.onload = () => {
-            // ปรับขนาดลายเซ็นให้เหมาะสม (ประมาณ 20% ของความกว้างหน้า)
             const signatureWidth = viewport.width * 0.2
             const signatureHeight = (signatureWidth * img.height) / img.width
 
@@ -135,66 +129,64 @@ const UploadPdf: React.FC = () => {
   }
 
   const savePdfWithSignature = async () => {
-  if (!pdfDocument || !canvasRef.current) return;
+    if (!pdfDocument || !canvasRef.current) return
 
-  try {
-    // สร้าง Base64 ของ PDF พร้อมลายเซ็น
-    const tempCanvas = document.createElement('canvas');
-    const tempCtx = tempCanvas.getContext('2d');
-    if (!tempCtx) return;
+    try {
+      const tempCanvas = document.createElement('canvas')
+      const tempCtx = tempCanvas.getContext('2d')
+      if (!tempCtx) return
 
-    tempCanvas.width = canvasRef.current.width;
-    tempCanvas.height = canvasRef.current.height;
-    tempCtx.drawImage(canvasRef.current, 0, 0);
+      tempCanvas.width = canvasRef.current.width
+      tempCanvas.height = canvasRef.current.height
+      tempCtx.drawImage(canvasRef.current, 0, 0)
 
-    if (showSignatureOnPdf && signatureImgUrl) {
-      const img = new Image();
-      img.src = signatureImgUrl;
-      await new Promise(resolve => {
-        img.onload = resolve;
-      });
+      if (showSignatureOnPdf && signatureImgUrl) {
+        const img = new Image()
+        img.src = signatureImgUrl
+        await new Promise(resolve => {
+          img.onload = resolve
+        })
 
-      const signatureWidth = tempCanvas.width * 0.2;
-      const signatureHeight = (signatureWidth * img.height) / img.width;
+        const signatureWidth = tempCanvas.width * 0.2
+        const signatureHeight = (signatureWidth * img.height) / img.width
 
-      tempCtx.drawImage(
-        img,
-        signaturePosition.x * (tempCanvas.width / canvasRef.current.offsetWidth),
-        signaturePosition.y * (tempCanvas.height / canvasRef.current.offsetHeight),
-        signatureWidth,
-        signatureHeight
-      );
-    }
-
-    const pdfWithSignatureBase64 = tempCanvas.toDataURL('image/png');
-    console.log(pdfWithSignatureBase64)
-
-    // อ่าน callback URL จาก query parameters
-    const urlParams = new URLSearchParams(window.location.search);
-    const callbackUrl = urlParams.get('callback');
-
-    if (callbackUrl) {
-      const response = await fetch(callbackUrl, {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ imageBase64: pdfWithSignatureBase64 }),
-
-      });
-
-      if (response.ok) {
-        alert('PDF with signature saved successfully!');
-        window.close()
-      } else {
-        alert('Failed to save PDF with signature.');
+        tempCtx.drawImage(
+          img,
+          signaturePosition.x * (tempCanvas.width / canvasRef.current.offsetWidth),
+          signaturePosition.y * (tempCanvas.height / canvasRef.current.offsetHeight),
+          signatureWidth,
+          signatureHeight
+        )
       }
-    } else {
-      alert('No callback URL provided.');
+
+      const pdfWithSignatureBase64 = tempCanvas.toDataURL('image/png')
+      console.log(pdfWithSignatureBase64)
+
+      // อ่าน callback URL จาก query parameters
+      const urlParams = new URLSearchParams(window.location.search)
+      const callbackUrl = urlParams.get('callback')
+
+      if (callbackUrl) {
+        const response = await fetch(callbackUrl, {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ imageBase64: pdfWithSignatureBase64 }),
+        })
+
+        if (response.ok) {
+          alert('PDF with signature saved successfully!')
+          window.close()
+        } else {
+          alert('Failed to save PDF with signature.')
+        }
+      } else {
+        alert('No callback URL provided.')
+      }
+    } catch (error) {
+      console.error('Error saving PDF:', error)
+      alert('Error saving file.' + error)
     }
-  } catch (error) {
-    console.error('Error saving PDF:', error);
-    alert('Error saving file.'+error);
   }
-};
 
   return (
     <div className="overflow-y-auto">
@@ -208,41 +200,39 @@ const UploadPdf: React.FC = () => {
       {pdfDocument && (
         <div ref={containerRef}>
           <TransformWrapper initialScale={1} minScale={1} maxScale={5} wheel={{ step: 0.1 }}>
-            {({ zoomIn, zoomOut, resetTransform }) => (
+            {({ zoomIn, zoomOut }) => (
               <>
-                <div className="flex gap-2 items-center justify-center border">
-                  <button
-                    onClick={() => zoomIn()}
-                    className="px-3 py-1 bg-blue-500 text-white rounded"
-                  >
-                    ซูมเข้า (+)
-                  </button>
-                  <button
-                    onClick={() => zoomOut()}
-                    className="px-3 py-1 bg-blue-500 text-white rounded"
-                  >
-                    ซูมออก (-)
-                  </button>
-                  <button
-                    onClick={() => resetTransform()}
-                    className="px-3 py-1 bg-gray-500 text-white rounded"
-                  >
-                    รีเซ็ต
-                  </button>
-                  <button
-                    onClick={() => setIsSignature(true)}
-                    className="flex items-center gap-1 px-3 py-1 bg-green-500 text-white rounded"
-                  >
-                    <Signature size={16} /> เพิ่มลายเซ็น
-                  </button>
-                  {showSignatureOnPdf && (
+                <div className="flex gap-2 items-center justify-between border">
+                  <div className="flex items-center gap-2">
                     <button
-                      onClick={() => setShowSignatureOnPdf(false)}
-                      className="flex items-center gap-1 px-3 py-1 bg-red-500 text-white rounded"
+                      onClick={() => zoomIn()}
+                      className="p-2 bg-blue-500 text-white rounded"
                     >
-                      <X size={16} /> ลบลายเซ็น
+                      <ZoomIn />
                     </button>
-                  )}
+                    <button
+                      onClick={() => zoomOut()}
+                      className="p-2 bg-blue-500 text-white rounded"
+                    >
+                      <ZoomOut />
+                    </button>
+                  </div>
+                  <div className="flex items-center gap-2">
+                    <button
+                      onClick={() => setIsSignature(true)}
+                      className="flex items-center gap-1 p-2 bg-green-500 text-white rounded"
+                    >
+                      <Signature/>
+                    </button>
+                    {showSignatureOnPdf && (
+                      <button
+                        onClick={() => setShowSignatureOnPdf(false)}
+                        className="flex items-center gap-1 p-2 bg-red-500 text-white rounded"
+                      >
+                        <X />
+                      </button>
+                    )}
+                  </div>
                 </div>
                 <div
                   className="flex justify-center flex-col border border-t-transparent relative w-full"
@@ -288,6 +278,12 @@ const UploadPdf: React.FC = () => {
               </>
             )}
           </TransformWrapper>
+          <button
+            onClick={savePdfWithSignature}
+            className="flex p-2 left-1/2 -translate-x-1/2 bottom-1/10 absolute bg-blue-600 text-white rounded"
+          >
+            <Save size={16} /> บันทึก PDF
+          </button>
         </div>
       )}
       {isSignature && (
@@ -373,12 +369,6 @@ const UploadPdf: React.FC = () => {
           </div>
         </div>
       )}
-      <button
-        onClick={savePdfWithSignature}
-        className="flex items-center gap-1 px-3 py-1 bg-blue-600 text-white rounded"
-      >
-        <Save size={16} /> บันทึก PDF
-      </button>
     </div>
   )
 }

@@ -4,3 +4,7 @@ canvas {
   width: 100%;
   height: auto;
 }
+
+button {
+  @apply cursor-pointer
+}
